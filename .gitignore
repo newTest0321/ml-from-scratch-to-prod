@@ -1,0 +1,7 @@
+venv/
+.venv/
+
+data/
+
+# Ignored because it is a large model file
+artifacts/random_forest/rf_model.joblib

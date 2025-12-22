@@ -1,0 +1,9 @@
+pandas
+numpy
+seaborn
+matplotlib
+dvc
+dvc_s3
+scikit-learn
+joblib
+wheel
