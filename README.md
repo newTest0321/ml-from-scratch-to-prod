@@ -1,202 +1,183 @@
 # ML from Scratch to Production
 
-An end-to-end **Machine Learning engineering and MLOps project** that demonstrates
-how to design, train, validate, and operationalize a machine learning model using
-**industry-standard, production-oriented ML practices**.
+An end-to-end **Machine Learning engineering project** that demonstrates how a
+model evolves from experimentation to **production-ready training pipelines,
+batch inference, and an online inference API**.
 
 The project uses the **California Housing dataset** as a reference use case and
-focuses on building a **reproducible, maintainable, and deployment-ready ML system**
-— progressing from experimentation to training pipelines, inference pipelines, and
-a production-grade online inference API.
+focuses on building a **clean, reproducible, and deployable ML system** with
+clear separation between modeling, pipelines, and serving.
 
----
 
-## 🎯 Project Objective
 
-The objectives of this project are to:
+## 🎯 What This Repository Represents
 
-* Engineer a regression model **from first principles**
-* Follow a **structured ML lifecycle** from data understanding to validation
-* Establish a **validated baseline model**
-* Migrate notebook-based experimentation into **production-grade Python pipelines**
-* Build a **production-ready inference service** for real-time predictions
-* Lay the foundation for a **full MLOps workflow** (CI/CD, tracking, deployment)
+* Finalized ML pipelines (training & batch inference)
+* A production-ready **FastAPI online inference service**
+* Automated tests for the API
+* Dockerized inference service
 
----
+Detailed ML experimentation and modeling rationale are **documented separately**
+and referenced below.
 
-## 🧠 Machine Learning Phase (Completed)
 
-The ML phase was implemented using a **progressive, evidence-driven approach**, where
-each modeling decision was backed by quantitative evaluation.
 
-### 1️⃣ Problem Framing & Data Understanding
+## 🧠 Machine Learning (Summary)
 
-* Defined prediction target: `median_house_value`
-* Dataset and feature analysis
-* Identification of numerical vs categorical features
-* Constraints and data quality considerations
+* Multiple model families were evaluated during experimentation
+* Feature engineering was validated across models
+* **Gradient Boosting (`HistGradientBoostingRegressor`)** achieved the best
+  generalization performance
+* This model was selected as the **production baseline**
+* Only the finalized model and required preprocessing logic were migrated to
+  Python pipelines
 
-### 2️⃣ Baseline Modeling
+📘 **Detailed ML reasoning, experiments, and decisions** are documented here:
 
-* Linear Regression
-* Ridge Regression
-* Used to diagnose bias, variance, and scaling behavior
+* `docs/` (step-by-step ML design)
+* `notebooks/` (experimentation history)
+* `ml-baseline` branch (ML-only checkpoint)
 
-### 3️⃣ Non-Linear Modeling
 
-* Decision Trees (unconstrained & constrained)
-* Random Forest for variance reduction and stability
 
-### 4️⃣ Feature Engineering
-
-* Domain-driven engineered features:
-
-  * Rooms per household
-  * Bedrooms per room
-  * Population per household
-* Systematic evaluation across model families
-
-### 5️⃣ Advanced Modeling
-
-* Gradient Boosting using `HistGradientBoostingRegressor`
-* Selected after Random Forest performance plateaued
-* Improved bias–variance tradeoff
-
-### 6️⃣ Model Validation
-
-* Hold-out test evaluation
-* Cross-validation for stability
-* Metrics: RMSE and R²
-
-👉 **Gradient Boosting with engineered features is selected as the current production baseline.**
-
----
-
-## 📊 Current Best Model
-
-| Model             | Test RMSE (≈) | CV RMSE (≈) | Notes                               |
-| ----------------- | ------------- | ----------- | ----------------------------------- |
-| Random Forest     | ~49k          | ~49k        | Stable non-linear baseline          |
-| Gradient Boosting | **~45.5k**    | **~46.5k**  | Lower bias, improved generalization |
-
-Cross-validation confirms consistent generalization across data splits.
-
----
-
-## ⚙️ Production Pipelines (Completed)
-
-Notebook experimentation has been **fully migrated to production-grade pipelines**.
-
-### ✅ Training Pipeline
-
-* Deterministic data splitting
-* Feature preprocessing (imputation, encoding, feature engineering)
-* Model training and evaluation
-* Artifact persistence (model, preprocessors, metrics)
-* Structured logging
-
-### ✅ Batch Inference Pipeline
-
-* Loads production artifacts
-* Applies identical preprocessing as training
-* Runs predictions on curated inference inputs
-* Outputs predictions separately from model artifacts
-
-These pipelines are designed to be:
-
-* Reproducible
-* CI/CD friendly
-* Aligned with online inference behavior
-
----
-
-## 🌐 Online Inference API (Completed)
-
-A **production-ready FastAPI service** has been implemented to serve the trained
-model for **real-time predictions**.
-
-### Key characteristics:
-
-* FastAPI-based REST API
-* Request/response validation using Pydantic schemas
-* Single-load artifact initialization using FastAPI lifespan events
-* Identical preprocessing logic shared with training and batch inference
-* Structured, file-based logging for API lifecycle and inference
-* Automated API tests (health, prediction, validation)
-* Fully containerized using Docker
-
-### Available endpoints:
-
-* `GET /health` — service health check
-* `POST /predict` — run online housing price predictions
-
-The API is designed to be:
-
-* Stateless
-* Deterministic
-* Deployment-ready (Docker-compatible)
-* Safe for CI/CD and cloud environments
-
----
-
-## 🗂️ Repository Structure
+## 🗂️ Repository Structure (Main Branch)
 
 ```
-CaliforniaHousePricePred
+root
 ├── artifacts/
-│   ├── experiments/         # Notebook experiment outputs (history)
-│   └── production/          # Single source of truth for deployment
+│   ├── experiments/         # Historical experiment outputs
+│   └── production/          # Deployment-ready ML artifacts
 ├── data/
 │   ├── raw/                 # Original dataset
-│   └── inference/           # Curated inference inputs
-├── docs/                    # Design decisions & ML reasoning
-├── notebooks/               # Exploratory ML experimentation
+│   └── inference/           # Inference inputs & generators
+├── docs/                    # ML design & decision records
+├── notebooks/               # Experimentation history
 ├── pipelines/               # Training & batch inference entry points
-├── src/                     # Reusable production ML & API code
-├── tests/                   # Automated API tests
-├── outputs/                 # Ephemeral inference outputs
-├── logs/                    # Pipeline and API logs
+├── src/                     # Production ML & API code
+├── tests/                   # API tests
+├── outputs/                 # Batch inference outputs
+├── logs/                    # Training, inference & API logs
 ├── Dockerfile               # Inference service containerization
-├── requirements/            # Split dependencies (base / train / api)
+├── requirements/            # Dependency split (base / train / api)
 └── README.md
 ```
 
 
----
 
-## 🚀 MLOps Phase (Next)
+## ⚙️ ML Pipelines (Completed)
 
-The next phase focuses on **automation and deployment maturity**:
+### Training Pipeline
 
-* CI/CD pipelines for training and API builds
-* Container registry integration
-* MLflow experiment tracking and model registry
-* Champion–challenger model promotion
-* Monitoring, alerting, and retraining strategies
+```bash
+python -m pipelines.train
+```
 
-The current system provides a **stable, production-ready foundation** for these
-MLOps extensions.
+* Loads raw dataset
+* Applies preprocessing and feature engineering
+* Trains the final Gradient Boosting model
+* Evaluates performance
+* Saves production artifacts
 
----
+Artifacts are written to:
 
-## 🧩 Design Principles
+```
+artifacts/production/
+```
 
-* Sequential ML development (baseline → validation → improvement)
-* Clear separation of experimentation, pipelines, and serving
-* Reproducibility and traceability at every stage
-* Evidence-based model selection
-* Infrastructure-agnostic ML system design
 
----
 
-## 📌 Summary
+### Batch Inference Pipeline
 
-This repository demonstrates how to evolve a machine learning project from
-notebook-based experimentation into a **fully operational ML system**, including:
+```bash
+python -m pipelines.inference
+```
 
-* Validated model development
-* Production-grade pipelines
-* Online inference via a tested, containerized API
-* A clear path toward end-to-end MLOps
+* Loads production artifacts
+* Applies identical preprocessing as training
+* Runs predictions on inference input data
+
+Outputs are written to:
+
+```
+outputs/predictions.json
+```
+
+Sample inference data can be generated using:
+
+```bash
+python data/inference/generate_sample.py
+```
+
+
+
+## 🌐 Online Inference API (Current Focus)
+
+The system exposes a **FastAPI-based online inference service** for real-time
+housing price predictions.
+
+### API Characteristics
+
+* FastAPI REST service
+* Request/response validation using Pydantic
+* Artifact loading via FastAPI lifespan events
+* Shared preprocessing logic with training & batch inference
+* Structured file-based logging
+* Automated API tests
+* Dockerized for deployment
+
+### Available Endpoints
+
+* `GET /health` — health check
+* `POST /predict` — run housing price predictions
+
+
+
+## ▶️ Running the API Locally (Python Environment)
+
+### 1️⃣ Create and activate a virtual environment
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+### 2️⃣ Install API dependencies
+
+```bash
+python -m pip install --upgrade pip
+pip install -r requirements/api.txt
+```
+
+### 3️⃣ Set Python path
+
+```bash
+export PYTHONPATH=$(pwd)/src
+```
+
+### 4️⃣ Start the API server
+
+```bash
+uvicorn api.main:app --reload
+```
+
+* API: [http://localhost:8000](http://localhost:8000)
+* Swagger UI: [http://localhost:8000/docs](http://localhost:8000/docs)
+
+
+
+## 🐳 Running the API with Docker
+
+```bash
+docker build -t housing-api .
+docker run -p 8000:8000 housing-api
+```
+
+
+
+## 🧪 Running Tests
+
+```bash
+pytest -v
+```
 
 ---
