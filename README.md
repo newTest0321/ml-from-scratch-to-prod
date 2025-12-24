@@ -1,183 +1,188 @@
 # ML from Scratch to Production
 
 An end-to-end **Machine Learning engineering project** that demonstrates how a
-model evolves from experimentation to **production-ready training pipelines,
-batch inference, and an online inference API**.
+model evolves from **experimentation** to **production-ready pipelines and
+serving systems**.
 
 The project uses the **California Housing dataset** as a reference use case and
 focuses on building a **clean, reproducible, and deployable ML system** with
-clear separation between modeling, pipelines, and serving.
+clear separation between:
 
+* experimentation
+* training pipelines
+* inference (batch & online)
+* MLOps concerns
 
 
 ## 🎯 What This Repository Represents
 
-* Finalized ML pipelines (training & batch inference)
-* A production-ready **FastAPI online inference service**
-* Automated tests for the API
-* Dockerized inference service
+This repository is structured to show the **progressive evolution** of an ML
+project, not just the final state.
 
-Detailed ML experimentation and modeling rationale are **documented separately**
-and referenced below.
+It demonstrates:
+
+* ML experimentation and reasoning
+* Migration from notebooks to pipelines
+* Batch inference workflows
+* A production-style **FastAPI online inference service**
+* Clean separation between training, tracking, and serving
+
+
+## 🌿 Branch Overview
+
+This repository uses **multiple branches** to represent different stages of
+maturity.
+
+### 🔹 `ml-baseline` — ML Experimentation
+
+Purpose:
+
+* Model experimentation and feature exploration
+* Notebook-driven workflows
+* ML reasoning and evaluation
+
+Includes:
+
+* Jupyter notebooks
+* ML-focused documentation
+* Multiple model experiments
+
+This branch answers:
+**“How was the model chosen?”**
+
+---
+
+### 🔹 `api-baseline` — Serving Without MLflow
+
+Purpose:
+
+* Introduce batch inference and an API
+* Use filesystem-based artifacts
+* Focus on serving logic, not MLOps tooling
+
+Includes:
+
+* Training and inference pipelines
+* FastAPI-based online inference
+* Local artifact loading
+* Dockerized API
+
+This branch answers:
+**“How do we serve a trained model?”**
+
+---
+
+### 🔹 `main` — MLOps-Oriented Workflow (Current)
+
+Purpose:
+
+* Introduce MLflow for experiment tracking and model registry
+* Prepare the system for CI/CD and automated deployments
+* Keep inference logic clean and registry-agnostic
+
+Includes:
+
+* MLflow-tracked training pipeline
+* Batch inference pipeline
+* Online inference API
+
+This branch answers:
+**“How does this become production-ready?”**
 
 
 
-## 🧠 Machine Learning (Summary)
+## 🧭 High-Level System Flow
 
-* Multiple model families were evaluated during experimentation
-* Feature engineering was validated across models
-* **Gradient Boosting (`HistGradientBoostingRegressor`)** achieved the best
-  generalization performance
-* This model was selected as the **production baseline**
-* Only the finalized model and required preprocessing logic were migrated to
-  Python pipelines
+```
+Raw Data
+   ↓
+Training Pipeline
+   ↓
+MLflow (experiment tracking & model registry)
+   ↓
+Batch Inference Pipeline
+   ↓
+Predictions (offline)
 
-📘 **Detailed ML reasoning, experiments, and decisions** are documented here:
+               ┌──────────────┐
+               │  FastAPI API │
+               │ (online use) │
+               └───────▲──────┘
+                       │
+                 Loaded model
+                 at startup
+```
 
-* `docs/` (step-by-step ML design)
-* `notebooks/` (experimentation history)
-* `ml-baseline` branch (ML-only checkpoint)
+Key ideas:
 
+* Training and serving are **decoupled**
+* MLflow is used for **tracking and registry**
+* Inference code loads models locally at runtime
+
+
+
+## 🚀 Getting Started (High-Level)
+
+1. **Explore ML experimentation**
+
+   * Switch to `ml-baseline` branch
+
+2. **Understand serving without MLOps**
+
+   * Switch to `api-baseline` branch
+
+3. **Run the full MLOps-style workflow**
+
+   * Stay on `main` branch
+   * Follow the documentation below
+
+
+
+## 📚 Documentation Guide
+
+Detailed documentation is intentionally split to keep concerns isolated.
+
+* **DVC (data versioning)**
+  → [docs/dvc.md](docs/dvc.md)
+
+* **MLflow (training & tracking)**
+  → [docs/mlflow.md](docs/mlflow.md)
+
+* **Batch inference & Online API**
+  → [docs/api.md](docs/api.md)
+
+Each document focuses only on its responsibility.
 
 
 ## 🗂️ Repository Structure (Main Branch)
 
 ```
 root
-├── artifacts/
-│   ├── experiments/         # Historical experiment outputs
-│   └── production/          # Deployment-ready ML artifacts
-├── data/
-│   ├── raw/                 # Original dataset
-│   └── inference/           # Inference inputs & generators
-├── docs/                    # ML design & decision records
-├── notebooks/               # Experimentation history
-├── pipelines/               # Training & batch inference entry points
-├── src/                     # Production ML & API code
-├── tests/                   # API tests
-├── outputs/                 # Batch inference outputs
-├── logs/                    # Training, inference & API logs
-├── Dockerfile               # Inference service containerization
-├── requirements/            # Dependency split (base / train / api)
+├── .dvc/              # DVC configuration
+├── data/              # Raw data and inference inputs
+├── docs/              # MLOps and API documentation
+├── pipelines/         # Training & batch inference entry points
+├── src/               # Core ML logic and API implementation
+├── tests/             # API tests
+├── outputs/           # Batch inference outputs
+├── Dockerfile         # API container definition
+├── requirements/      # Dependency separation (train / api)
 └── README.md
 ```
 
 
+## 🧪 Testing
 
-## ⚙️ ML Pipelines (Completed)
-
-### Training Pipeline
-
-```bash
-python -m pipelines.train
-```
-
-* Loads raw dataset
-* Applies preprocessing and feature engineering
-* Trains the final Gradient Boosting model
-* Evaluates performance
-* Saves production artifacts
-
-Artifacts are written to:
-
-```
-artifacts/production/
-```
-
-
-
-### Batch Inference Pipeline
-
-```bash
-python -m pipelines.inference
-```
-
-* Loads production artifacts
-* Applies identical preprocessing as training
-* Runs predictions on inference input data
-
-Outputs are written to:
-
-```
-outputs/predictions.json
-```
-
-Sample inference data can be generated using:
-
-```bash
-python data/inference/generate_sample.py
-```
-
-
-
-## 🌐 Online Inference API (Current Focus)
-
-The system exposes a **FastAPI-based online inference service** for real-time
-housing price predictions.
-
-### API Characteristics
-
-* FastAPI REST service
-* Request/response validation using Pydantic
-* Artifact loading via FastAPI lifespan events
-* Shared preprocessing logic with training & batch inference
-* Structured file-based logging
-* Automated API tests
-* Dockerized for deployment
-
-### Available Endpoints
-
-* `GET /health` — health check
-* `POST /predict` — run housing price predictions
-
-
-
-## ▶️ Running the API Locally (Python Environment)
-
-### 1️⃣ Create and activate a virtual environment
-
-```bash
-python3 -m venv venv
-source venv/bin/activate
-```
-
-### 2️⃣ Install API dependencies
-
-```bash
-python -m pip install --upgrade pip
-pip install -r requirements/api.txt
-```
-
-### 3️⃣ Set Python path
-
-```bash
-export PYTHONPATH=$(pwd)/src
-```
-
-### 4️⃣ Start the API server
-
-```bash
-uvicorn api.main:app --reload
-```
-
-* API: [http://localhost:8000](http://localhost:8000)
-* Swagger UI: [http://localhost:8000/docs](http://localhost:8000/docs)
-
-
-
-## 🐳 Running the API with Docker
-
-```bash
-docker build -t housing-api .
-docker run -p 8000:8000 housing-api
-```
-
-
-
-## 🧪 Running Tests
+API tests can be executed with:
 
 ```bash
 pytest -v
 ```
+
+
+## 🐳 Containerization
+
+The online inference API is Dockerized for deployment and portability.
+Refer to [docs/api.md](docs/api.md) for details.
 
 ---

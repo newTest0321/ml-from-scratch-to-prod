@@ -12,7 +12,7 @@ logger = get_logger(
     log_file=LOG_DIR / "api.log"
 )
 
-ARTIFACT_DIR = Path("artifacts/production")
+ARTIFACT_DIR = Path("model_artifacts/")
 ARTIFACTS = {}
 
 

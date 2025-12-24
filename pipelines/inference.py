@@ -19,7 +19,7 @@ logger = get_logger(
     log_file=LOG_DIR / 'inference.log'
 )
 
-ARTIFACTS_DIR = Path('artifacts/production')
+ARTIFACTS_DIR = Path('model_artifacts/')
 INPUT_DATA = Path('data/inference/sample_input.csv')
 OUTPUT_PATH = Path("outputs/batch_run_001.json")
 

@@ -14,7 +14,7 @@ COPY requirements/api.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src/ src/
-COPY artifacts/production/ artifacts/production/
+COPY model_artifacts/ model_artifacts/
 
 EXPOSE 8000
 

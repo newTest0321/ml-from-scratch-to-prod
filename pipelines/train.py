@@ -3,13 +3,20 @@ Training pipeline
 ----------------------------------------------------------
 - Loads raw data
 - Applies preprocessing & feature engineering
-- Trains HistGradientBoostingRegressor
+- Trains HistGradientBoostingRegressor (approved production model)
 - Evaluates on holdout set
-- Saves model, preprocessors, and metrics
+- Logs params, metrics, dataset lineage, preprocessors, and model to MLflow
+- Registers model and assigns a production alias (modern MLflow practice)
 """
 
 import pandas as pd
 from pathlib import Path
+import mlflow
+import mlflow.sklearn
+from mlflow.tracking import MlflowClient
+import yaml
+import joblib
+import shutil
 
 from preprocessing import (
     split_features,
@@ -23,113 +30,172 @@ from preprocessing import (
 
 from models import fit_hgb_model, evaluate_regression
 from inference import predict
-from utils import save_joblib, save_json, get_logger
+from utils import get_logger
 
+
+# --------------------------------------------------
+# Config
+# --------------------------------------------------
 LOG_DIR = Path("logs")
-logger = get_logger(
-    name="train_pipeline",
-    log_file=LOG_DIR / "train.log"
-)
+logger = get_logger("train_pipeline", LOG_DIR / "train.log")
 
-ARTIFACT_DIR = Path("artifacts/production")
 DATA_PATH = Path("data/raw/housing.csv")
+DVC_FILE = Path("data/raw/housing.csv.dvc")
 TARGET_COL = "median_house_value"
 
+EXPERIMENT_NAME = "california_housing_price"
+RUN_NAME = "hist_gradient_boosting"
 
+REGISTERED_MODEL_NAME = "CaliforniaHousingRegressor"
+MODEL_ALIAS = "production" 
+
+# Temporary directory used only for MLflow artifact upload
+ARTIFACT_DIR = Path("model_artifacts")
+
+
+# --------------------------------------------------
+# Helpers
+# --------------------------------------------------
+def get_dvc_data_md5() -> str:
+    """Read dataset hash directly from .dvc file"""
+    try:
+        with open(DVC_FILE) as f:
+            dvc_yaml = yaml.safe_load(f)
+        return dvc_yaml["outs"][0]["md5"]
+    except Exception:
+        return "unknown"
+
+
+# --------------------------------------------------
+# Training Pipeline
+# --------------------------------------------------
 def run_training():
     logger.info("Starting training pipeline")
-    # --------------------------------------------------
-    # Load data
-    # --------------------------------------------------
-    logger.info("Loading raw dataset")
-    df = pd.read_csv(DATA_PATH)
 
-    # --------------------------------------------------
-    # Split features & target
-    # --------------------------------------------------
-    logger.info("Splitting features and target")
-    X, y = split_features(df, TARGET_COL)
-    X_train, X_test, y_train, y_test = train_test_split_data(
-        X, y, test_size=0.2, random_state=42
-    )
+    mlflow.set_experiment(EXPERIMENT_NAME)
 
-    # --------------------------------------------------
-    # Imputation
-    # --------------------------------------------------
-    logger.info("Fitting and applying imputer")
-    column_to_impute = "total_bedrooms"
-    imputer = fit_median_imputer(X_train, column_to_impute)   # (fit on train only)
+    with mlflow.start_run(run_name=RUN_NAME) as run:
+        logger.info(f"MLflow run started with run_id={run.info.run_id}")
 
-    X_train = apply_imputer_transformation(X_train, column_to_impute, imputer)
-    X_test = apply_imputer_transformation(X_test, column_to_impute, imputer)
+        # --------------------------------------------------
+        # Load data
+        # --------------------------------------------------
+        logger.info("Loading raw dataset")
+        df = pd.read_csv(DATA_PATH)
 
-    # --------------------------------------------------
-    # Encoding 
-    # --------------------------------------------------
-    logger.info("Fitting and applying one-hot encoder")
-    column_to_encode = "ocean_proximity"
-    encoder = fit_one_hot_encoder(X_train, column_to_encode)   # (fit on train only)
+        dataset = mlflow.data.from_pandas(
+            df,
+            name="california_housing_raw",
+        )
+        mlflow.log_input(dataset, context="training")
+        mlflow.set_tag("data_dvc_md5", get_dvc_data_md5())
 
-    X_train = apply_one_hot_encoder(X_train, column_to_encode, encoder)
-    X_test = apply_one_hot_encoder(X_test, column_to_encode, encoder)
+        # --------------------------------------------------
+        # Train / test split
+        # --------------------------------------------------
+        X, y = split_features(df, TARGET_COL)
+        X_train, X_test, y_train, y_test = train_test_split_data(
+            X, y, test_size=0.2, random_state=42
+        )
 
-    # --------------------------------------------------
-    # Feature engineering
-    # --------------------------------------------------
-    logger.info("Applying feature engineering")
-    X_train = add_engineered_features(X_train)
-    X_test = add_engineered_features(X_test)
+        # --------------------------------------------------
+        # Imputation
+        # --------------------------------------------------
+        imputer = fit_median_imputer(X_train, "total_bedrooms")
+        X_train = apply_imputer_transformation(X_train, "total_bedrooms", imputer)
+        X_test = apply_imputer_transformation(X_test, "total_bedrooms", imputer)
 
-    # --------------------------------------------------
-    # Train model
-    # --------------------------------------------------
-    logger.info("Training HistGradientBoostingRegressor")
-    params = {
-        "max_depth": 8,
-        "learning_rate": 0.1,
-        "max_iter": 200,
-        "random_state": 42
-    }
+        # --------------------------------------------------
+        # Encoding
+        # --------------------------------------------------
+        encoder = fit_one_hot_encoder(X_train, "ocean_proximity")
+        X_train = apply_one_hot_encoder(X_train, "ocean_proximity", encoder)
+        X_test = apply_one_hot_encoder(X_test, "ocean_proximity", encoder)
 
-    model = fit_hgb_model(X_train, y_train, params)
+        # --------------------------------------------------
+        # Feature engineering
+        # --------------------------------------------------
+        X_train = add_engineered_features(X_train)
+        X_test = add_engineered_features(X_test)
 
-    # --------------------------------------------------
-    # Evaluate
-    # --------------------------------------------------
-    logger.info("Evaluating model")
-    y_train_pred = predict(model, X_train)
-    y_test_pred = predict(model, X_test)
-
-    train_metrics = evaluate_regression(y_train, y_train_pred)
-    test_metrics = evaluate_regression(y_test, y_test_pred)
-
-    logger.info(f"Train metrics: {train_metrics}")
-    logger.info(f"Test metrics : {test_metrics}")
-
-    # --------------------------------------------------
-    # Prepare metrics structure
-    # --------------------------------------------------
-    metrics = {
-        "model_family": "gradient_boosting",
-        "model_name": "hist_gradient_boosting",
-        "holdout": {
-            "train": train_metrics,
-            "test": test_metrics
+        # --------------------------------------------------
+        # Train model
+        # --------------------------------------------------
+        params = {
+            "max_depth": 8,
+            "learning_rate": 0.1,
+            "max_iter": 200,
+            "random_state": 42,
         }
-    }
+        mlflow.log_params(params)
 
-    # --------------------------------------------------
-    # Save artifacts
-    # --------------------------------------------------
-    logger.info("Saving model and artifacts")
-    ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
+        model = fit_hgb_model(X_train, y_train, params)
 
-    save_joblib(model, ARTIFACT_DIR / "model.joblib")
-    save_joblib(imputer, ARTIFACT_DIR / "imputer.joblib")
-    save_joblib(encoder, ARTIFACT_DIR / "encoder.joblib")
-    save_json(metrics, ARTIFACT_DIR / "metrics.json")
+        # --------------------------------------------------
+        # Evaluate
+        # --------------------------------------------------
+        y_train_pred = predict(model, X_train)
+        y_test_pred = predict(model, X_test)
 
-    logger.info("Training pipeline completed successfully")
+        train_metrics = evaluate_regression(y_train, y_train_pred)
+        test_metrics = evaluate_regression(y_test, y_test_pred)
+
+        for k, v in train_metrics.items():
+            mlflow.log_metric(f"train_{k}", v)
+        for k, v in test_metrics.items():
+            mlflow.log_metric(f"test_{k}", v)
+
+        # --------------------------------------------------
+        # Log preprocessing artifacts (temporary local → MLflow)
+        # --------------------------------------------------
+        ARTIFACT_DIR.mkdir(exist_ok=True)
+
+        joblib.dump(imputer, ARTIFACT_DIR / "imputer.joblib")
+        joblib.dump(encoder, ARTIFACT_DIR / "encoder.joblib")
+
+        mlflow.log_artifacts(ARTIFACT_DIR, artifact_path="preprocessing")
+
+        # --------------------------------------------------
+        # Log and register model
+        # --------------------------------------------------
+        mlflow.sklearn.log_model(
+            sk_model=model,
+            name="model",
+            registered_model_name=REGISTERED_MODEL_NAME,
+        )
+        joblib.dump(model, ARTIFACT_DIR / "model.joblib")
+        
+
+        # --------------------------------------------------
+        # Assign model alias
+        # --------------------------------------------------
+        client = MlflowClient()
+        model_versions = client.search_model_versions(
+            f"name='{REGISTERED_MODEL_NAME}'"
+        )
+
+        # Find model version created by this run
+        current_version = next(
+            mv.version for mv in model_versions if mv.run_id == run.info.run_id
+        )
+
+        # Set alias to point to current version
+        client.set_registered_model_alias(
+            name=REGISTERED_MODEL_NAME,
+            alias=MODEL_ALIAS,
+            version=current_version,
+        )
+
+        logger.info(
+            f"Model version {current_version} promoted via alias '{MODEL_ALIAS}'"
+        )
+
+        # --------------------------------------------------
+        # Cleanup temporary artifact directory
+        # --------------------------------------------------
+        # shutil.rmtree(ARTIFACT_DIR, ignore_errors=True)
+
+        logger.info("Training pipeline completed successfully")
 
 
 if __name__ == "__main__":

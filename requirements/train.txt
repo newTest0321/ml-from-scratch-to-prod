@@ -7,3 +7,4 @@ dvc_s3
 scikit-learn
 joblib
 pytest
+mlflow
