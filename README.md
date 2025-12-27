@@ -1,188 +1,143 @@
-# ML from Scratch to Production
+# 🚀 ML from Scratch to Production
 
-An end-to-end **Machine Learning engineering project** that demonstrates how a
-model evolves from **experimentation** to **production-ready pipelines and
-serving systems**.
+<div align="center">
 
-The project uses the **California Housing dataset** as a reference use case and
-focuses on building a **clean, reproducible, and deployable ML system** with
-clear separation between:
+[![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Scikit Learn](https://img.shields.io/badge/Scikit_Learn-F7931E?logo=scikit-learn&logoColor=white)](https://scikit-learn.org/)
+[![DVC](https://img.shields.io/badge/DVC-13ADC7?logo=dvc&logoColor=white)](https://dvc.org/)
+[![MLflow](https://img.shields.io/badge/MLflow-0194E2?logo=mlflow&logoColor=white)](https://mlflow.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5?logo=kubernetes&logoColor=white)](https://kubernetes.io/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-* experimentation
-* training pipelines
-* inference (batch & online)
-* MLOps concerns
+**An end-to-end Machine Learning engineering project that demonstrates how an ML system evolves from experimentation into a production-ready, containerized, and deployable service.**
 
-
-## 🎯 What This Repository Represents
-
-This repository is structured to show the **progressive evolution** of an ML
-project, not just the final state.
-
-It demonstrates:
-
-* ML experimentation and reasoning
-* Migration from notebooks to pipelines
-* Batch inference workflows
-* A production-style **FastAPI online inference service**
-* Clean separation between training, tracking, and serving
-
-
-## 🌿 Branch Overview
-
-This repository uses **multiple branches** to represent different stages of
-maturity.
-
-### 🔹 `ml-baseline` — ML Experimentation
-
-Purpose:
-
-* Model experimentation and feature exploration
-* Notebook-driven workflows
-* ML reasoning and evaluation
-
-Includes:
-
-* Jupyter notebooks
-* ML-focused documentation
-* Multiple model experiments
-
-This branch answers:
-**“How was the model chosen?”**
-
----
-
-### 🔹 `api-baseline` — Serving Without MLflow
-
-Purpose:
-
-* Introduce batch inference and an API
-* Use filesystem-based artifacts
-* Focus on serving logic, not MLOps tooling
-
-Includes:
-
-* Training and inference pipelines
-* FastAPI-based online inference
-* Local artifact loading
-* Dockerized API
-
-This branch answers:
-**“How do we serve a trained model?”**
-
----
-
-### 🔹 `main` — MLOps-Oriented Workflow (Current)
-
-Purpose:
-
-* Introduce MLflow for experiment tracking and model registry
-* Prepare the system for CI/CD and automated deployments
-* Keep inference logic clean and registry-agnostic
-
-Includes:
-
-* MLflow-tracked training pipeline
-* Batch inference pipeline
-* Online inference API
-
-This branch answers:
-**“How does this become production-ready?”**
+</div>
 
 
 
-## 🧭 High-Level System Flow
+## 🎯 Project Overview
 
-```
-Raw Data
-   ↓
-Training Pipeline
-   ↓
-MLflow (experiment tracking & model registry)
-   ↓
-Batch Inference Pipeline
-   ↓
-Predictions (offline)
+This repository demonstrates the **full lifecycle of a Machine Learning system**, from early experimentation to production-oriented deployment.
 
-               ┌──────────────┐
-               │  FastAPI API │
-               │ (online use) │
-               └───────▲──────┘
-                       │
-                 Loaded model
-                 at startup
+Using the **California Housing dataset**, the project focuses on **engineering practices**:
+
+- Reproducible training pipelines
+- Explicit separation between training and serving
+- Model lifecycle management with MLflow
+- Batch and online inference workflows
+- Docker-first execution
+- Kubernetes-ready architecture
+
+
+
+## 🌿 Branch Architecture
+
+This repository is structured as a **progressive learning path**, with each branch representing a stage in ML system maturity.
+
+| Branch | Focus | Key Question |
+|------|------|-------------|
+| `ml-baseline` | ML experimentation | *How do we explore data and choose a model?* |
+| `api-baseline` | Serving fundamentals | *How do we expose a trained model?* |
+| `main` | Production MLOps | *How does this become reliable and deployable?* |
+
+The `main` branch represents the **final, production-oriented design**.
+
+
+
+## 🏗️ System Architecture Overview
+
+```mermaid
+graph TB
+    subgraph "Data Layer"
+        A[Raw Data<br/>data/raw/housing.csv] --> B[DVC Versioning]
+    end
+    
+    subgraph "Training Pipeline"
+        C[Training Script<br/>pipelines/train.py] --> D[MLflow Tracking]
+        D --> E[Model Registry<br/>CaliforniaHousingRegressor]
+    end
+    
+    subgraph "Inference Layer"
+        F[Batch Inference<br/>pipelines/inference.py]
+        G[Online API<br/>src/api/]
+        E --> F
+        E --> G
+    end
+    
+    subgraph "Deployment"
+        H[Docker Compose]
+        I[Kubernetes/KServe]
+        G --> H
+        G --> I
+    end
+    
+    A --> C
+    B --> C
 ```
 
-Key ideas:
-
-* Training and serving are **decoupled**
-* MLflow is used for **tracking and registry**
-* Inference code loads models locally at runtime
 
 
+## 🚀 Quick Start (Main Branch)
 
-## 🚀 Getting Started (High-Level)
+```bash
+git clone https://github.com/atkaridarshan04/ml-from-scratch-to-prod.git
+cd ml-from-scratch-to-prod
+git checkout main
+```
 
-1. **Explore ML experimentation**
+The recommended way to run the system locally is **Docker**.
 
-   * Switch to `ml-baseline` branch
-
-2. **Understand serving without MLOps**
-
-   * Switch to `api-baseline` branch
-
-3. **Run the full MLOps-style workflow**
-
-   * Stay on `main` branch
-   * Follow the documentation below
+➡️ See: [docs/environments/docker.md](./docs/environments/docker.md)
 
 
 
-## 📚 Documentation Guide
-
-Detailed documentation is intentionally split to keep concerns isolated.
-
-* **DVC (data versioning)**
-  → [docs/dvc.md](docs/dvc.md)
-
-* **MLflow (training & tracking)**
-  → [docs/mlflow.md](docs/mlflow.md)
-
-* **Batch inference & Online API**
-  → [docs/api.md](docs/api.md)
-
-Each document focuses only on its responsibility.
-
-
-## 🗂️ Repository Structure (Main Branch)
+## 🗂️ Project Structure (Main)
 
 ```
-root
-├── .dvc/              # DVC configuration
-├── data/              # Raw data and inference inputs
-├── docs/              # MLOps and API documentation
-├── pipelines/         # Training & batch inference entry points
-├── src/               # Core ML logic and API implementation
-├── tests/             # API tests
-├── outputs/           # Batch inference outputs
-├── Dockerfile         # API container definition
-├── requirements/      # Dependency separation (train / api)
-└── README.md
+ml-from-scratch-to-prod/
+├── .dvc/                 # DVC configuration
+├── data/                 # Raw data and inference inputs
+├── docs/                 # Architecture, workflows, and decisions
+├── pipelines/            # Training & batch inference entry points
+├── src/                  # Core ML logic and API implementation
+├── tests/                # API tests
+├── Dockerfile.api        # Inference API image
+├── Dockerfile.train      # Training image
+├── docker-compose.yml    # Local orchestration
+├── requirements/         # Dependency separation (train / api)
+└── README.md             # This file
 ```
+
+
+
+## 📚 Documentation Hub
+
+All documentation lives under `docs/` and is organized by **concern**.
+
+| Area            | Description                                   |
+| --------------- | --------------------------------------------- |        
+| [codebase/](./docs/codebase/)     | Source code organization and design decisions |
+| [workflows/](./docs/workflows/)    | Training and inference pipelines              |
+| [environments/](./docs/environments/) | Local, Docker, and Kubernetes execution       |
+| [mlflow/](./docs/mlflow/)       | Experiment tracking and model lifecycle       |        
+
+Start here:
+
+➡️ [docs/README.md](./docs/README.md)
+
 
 
 ## 🧪 Testing
-
-API tests can be executed with:
 
 ```bash
 pytest -v
 ```
 
+## 📄 License
 
-## 🐳 Containerization
-
-The online inference API is Dockerized for deployment and portability.
-Refer to [docs/api.md](docs/api.md) for details.
+This project is licensed under the MIT License.
+See the [LICENSE](LICENSE) file for details.
 
 ---

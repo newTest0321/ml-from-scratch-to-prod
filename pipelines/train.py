@@ -9,14 +9,16 @@ Training pipeline
 - Registers model and assigns a production alias (modern MLflow practice)
 """
 
+import logging
 import pandas as pd
 from pathlib import Path
 import mlflow
 import mlflow.sklearn
 from mlflow.tracking import MlflowClient
 import yaml
-import joblib
-import shutil
+from inference import HousingInferencePipeline
+import mlflow.pyfunc
+from mlflow.models import infer_signature
 
 from preprocessing import (
     split_features,
@@ -29,15 +31,18 @@ from preprocessing import (
 )
 
 from models import fit_hgb_model, evaluate_regression
-from inference import predict
-from utils import get_logger
 
 
 # --------------------------------------------------
 # Config
 # --------------------------------------------------
-LOG_DIR = Path("logs")
-logger = get_logger("train_pipeline", LOG_DIR / "train.log")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+)
+
+logger = logging.getLogger("train_pipeline")
+
 
 DATA_PATH = Path("data/raw/housing.csv")
 DVC_FILE = Path("data/raw/housing.csv.dvc")
@@ -48,9 +53,6 @@ RUN_NAME = "hist_gradient_boosting"
 
 REGISTERED_MODEL_NAME = "CaliforniaHousingRegressor"
 MODEL_ALIAS = "production" 
-
-# Temporary directory used only for MLflow artifact upload
-ARTIFACT_DIR = Path("model_artifacts")
 
 
 # --------------------------------------------------
@@ -94,16 +96,18 @@ def run_training():
         # Train / test split
         # --------------------------------------------------
         X, y = split_features(df, TARGET_COL)
-        X_train, X_test, y_train, y_test = train_test_split_data(
+        X_raw_train, X_raw_test, y_train, y_test = train_test_split_data(
             X, y, test_size=0.2, random_state=42
         )
+        logger.info("Train Test Split Completed")
 
         # --------------------------------------------------
         # Imputation
         # --------------------------------------------------
-        imputer = fit_median_imputer(X_train, "total_bedrooms")
-        X_train = apply_imputer_transformation(X_train, "total_bedrooms", imputer)
-        X_test = apply_imputer_transformation(X_test, "total_bedrooms", imputer)
+        imputer = fit_median_imputer(X_raw_train, "total_bedrooms")
+        X_train = apply_imputer_transformation(X_raw_train, "total_bedrooms", imputer)
+        X_test = apply_imputer_transformation(X_raw_test, "total_bedrooms", imputer)
+        logger.info("Imputation Completed")
 
         # --------------------------------------------------
         # Encoding
@@ -111,12 +115,14 @@ def run_training():
         encoder = fit_one_hot_encoder(X_train, "ocean_proximity")
         X_train = apply_one_hot_encoder(X_train, "ocean_proximity", encoder)
         X_test = apply_one_hot_encoder(X_test, "ocean_proximity", encoder)
+        logger.info("Encoding Completed")
 
         # --------------------------------------------------
         # Feature engineering
         # --------------------------------------------------
         X_train = add_engineered_features(X_train)
         X_test = add_engineered_features(X_test)
+        logger.info("Feature Engineering Completed")
 
         # --------------------------------------------------
         # Train model
@@ -130,12 +136,13 @@ def run_training():
         mlflow.log_params(params)
 
         model = fit_hgb_model(X_train, y_train, params)
+        logger.info("Model Trainning Finished")
 
         # --------------------------------------------------
         # Evaluate
         # --------------------------------------------------
-        y_train_pred = predict(model, X_train)
-        y_test_pred = predict(model, X_test)
+        y_train_pred = model.predict(X_train)
+        y_test_pred = model.predict(X_test)
 
         train_metrics = evaluate_regression(y_train, y_train_pred)
         test_metrics = evaluate_regression(y_test, y_test_pred)
@@ -145,26 +152,44 @@ def run_training():
         for k, v in test_metrics.items():
             mlflow.log_metric(f"test_{k}", v)
 
-        # --------------------------------------------------
-        # Log preprocessing artifacts (temporary local → MLflow)
-        # --------------------------------------------------
-        ARTIFACT_DIR.mkdir(exist_ok=True)
-
-        joblib.dump(imputer, ARTIFACT_DIR / "imputer.joblib")
-        joblib.dump(encoder, ARTIFACT_DIR / "encoder.joblib")
-
-        mlflow.log_artifacts(ARTIFACT_DIR, artifact_path="preprocessing")
+        logger.info("Metrics Evaluation Completed")
 
         # --------------------------------------------------
-        # Log and register model
+        # Build inference pipeline (preprocessing + model)
+        # --------------------------------------------------
+        inference_pipeline = HousingInferencePipeline(
+            imputer=imputer,
+            encoder=encoder,
+            model=model,
+        )
+        logger.info("Unifined Model is ready")
+
+        # --------------------------------------------------
+        # Log and register unified model with signature
+        # --------------------------------------------------
+
+        input_example = X_raw_train.iloc[:3].copy()
+        pred_example = inference_pipeline.predict(input_example)
+        signature = infer_signature(input_example, pred_example)
+
+        mlflow.pyfunc.log_model(
+            name="model",
+            python_model=inference_pipeline,
+            code_paths=["src"],  
+            pip_requirements="requirements/train.txt",
+            registered_model_name=REGISTERED_MODEL_NAME,
+            input_example=input_example,
+            signature=signature,
+        )
+        logger.info("Unified model looged and registered sucessfully")
+
+        # --------------------------------------------------
+        # Log the hgb model
         # --------------------------------------------------
         mlflow.sklearn.log_model(
             sk_model=model,
-            name="model",
-            registered_model_name=REGISTERED_MODEL_NAME,
+            name="hgb-model",
         )
-        joblib.dump(model, ARTIFACT_DIR / "model.joblib")
-        
 
         # --------------------------------------------------
         # Assign model alias

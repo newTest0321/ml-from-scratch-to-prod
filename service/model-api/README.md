@@ -1,0 +1,1 @@
+For details about the api-design of the Model API, please refer to the [API Design Documentation](../../docs/codebase/api-design.md).

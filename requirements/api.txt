@@ -1,8 +1,6 @@
+fastapi
+uvicorn
+pydantic
 pandas
 scikit-learn
-joblib
-pydantic 
-fastapi
-uvicorn[standard]
-pytest
-mlflow
+mlflow-skinny

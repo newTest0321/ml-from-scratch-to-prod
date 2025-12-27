@@ -1,16 +1,14 @@
+import logging
 import pandas as pd
-from pathlib import Path
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
-from api.schemas import PredictionRequest, PredictionResponse
-from inference import preprocess_input, predict
-from utils import get_logger
+from .schemas import PredictionRequest, PredictionResponse
 
-LOG_DIR = Path("logs")
-logger = get_logger(
-    name="api.predict",
-    log_file=LOG_DIR / "api.log"
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
 )
+logger = logging.getLogger("api-predict")
 
 router = APIRouter()
 
@@ -20,7 +18,7 @@ router = APIRouter()
     summary="Run housing price predictions",
 )
 def predict_prices(
-    request: PredictionRequest,
+    request: PredictionRequest, http_request: Request
 ):
     """
     Run model inference on input housing features.
@@ -32,17 +30,10 @@ def predict_prices(
 
         logger.info(f"Received prediction request with {len(df)} records")
 
-        # Load artifacts from app state
-        from api.main import ARTIFACTS
+        # Import the unified model from app state
+        model = http_request.app.state.model 
+        preds = model.predict(df)
 
-        if not ARTIFACTS:
-            raise RuntimeError("Model artifacts not loaded")
-
-        # Preprocess
-        X = preprocess_input(df, ARTIFACTS)
-
-        # Predict
-        preds = predict(ARTIFACTS["model"], X)
         logger.info("Prediction request completed successfully")
 
         return PredictionResponse(predictions=preds.tolist())

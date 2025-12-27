@@ -17,8 +17,7 @@ venv/
 *rf_model.joblib
 
 logs
+outputs
 
 mlruns
 mlflow.db
-mlflow_artifacts
-model_artifacts

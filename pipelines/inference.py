@@ -1,59 +1,69 @@
 """
 Batch inference pipeline
 ------------------------
-- Loads production artifacts
+- Loads production model from MLflow
 - Loads input data
-- Applies preprocessing
 - Runs predictions
 - Saves predictions
 """
 
-from inference import load_prod_artifacts, preprocess_input, predict
-from utils import get_logger, save_json
+import logging
+import json
 from pathlib import Path
 import pandas as pd
+import mlflow
 
-LOG_DIR = Path('logs')
-logger = get_logger(
-    name='inference_pipeline',
-    log_file=LOG_DIR / 'inference.log'
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
 )
 
-ARTIFACTS_DIR = Path('model_artifacts/')
-INPUT_DATA = Path('data/inference/sample_input.csv')
+logger = logging.getLogger("inference_pipeline")
+
+
+MODEL_URI = "models:/CaliforniaHousingRegressor@production"
+INPUT_DATA = Path("data/inference/sample_input.csv")
 OUTPUT_PATH = Path("outputs/batch_run_001.json")
+
 
 def run_inference():
     logger.info("Starting batch inference pipeline")
 
-    # Load Artifacts
-    logger.info("Loading production artifacts")
-    artifacts = load_prod_artifacts(ARTIFACTS_DIR)
+    # --------------------------------------------------
+    # Load model from MLflow
+    # --------------------------------------------------
+    logger.info("Loading production model from MLflow")
+    model = mlflow.pyfunc.load_model(MODEL_URI)
 
-    # Load Input Data
+    # --------------------------------------------------
+    # Load input data
+    # --------------------------------------------------
     logger.info("Loading input data")
     df = pd.read_csv(INPUT_DATA)
-    
-    # Drop Target if exists
+
     if "median_house_value" in df:
         df = df.drop(columns=["median_house_value"])
 
-    # Preprocess Input Data
-    logger.info("Applying preprocessing")
-    X = preprocess_input(df, artifacts)
+    # --------------------------------------------------
+    # Run predictions
+    # --------------------------------------------------
+    logger.info("Running predictions")
+    predictions = model.predict(df)
 
-    # Find Predictions
-    logger.info("Running Predictions")
-    predictions = predict(artifacts['model'], X)
-
+    # --------------------------------------------------
     # Save predictions
+    # --------------------------------------------------
     logger.info("Saving predictions")
-    save_json(
-        {"predictions": predictions.tolist()},
-        OUTPUT_PATH
-    )
+    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(OUTPUT_PATH, "w") as f:
+        json.dump(
+            {"predictions": predictions.tolist()},
+            f,
+            indent=2,
+        )
 
-    logger.info("Inference pipeline completed successfully")
+    logger.info("Batch inference pipeline completed successfully")
+
 
 if __name__ == "__main__":
     run_inference()
