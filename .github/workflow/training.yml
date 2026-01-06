@@ -1,0 +1,99 @@
+name: Model Training Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "src/**"
+      - "pipelines/**"
+      - "requirements.txt"
+      - "Dockerfile.train"
+      - "data/**/*.dvc"
+      - ".dvc/**"
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ml-trainer
+  K8S_NAMESPACE: default
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      code_changed: ${{ steps.filter.outputs.code }}
+      data_changed: ${{ steps.filter.outputs.data }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect code vs data changes
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            code:
+              - src/**
+              - pipelines/**
+              - requirements.txt
+              - Dockerfile.train
+            data:
+              - data/**/*.dvc
+              - .dvc/**
+
+  build-trainer-image:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.code_changed == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GH_TOKEN }}
+
+      - name: Build & push training image
+        run: |
+          docker build \
+            -f Dockerfile.train \
+            -t $REGISTRY/${{ github.repository_owner }}/$IMAGE_NAME:${{ github.sha }} \
+            -t $REGISTRY/${{ github.repository_owner }}/$IMAGE_NAME:latest \
+            .
+          docker push --all-tags $REGISTRY/${{ github.repository_owner }}/$IMAGE_NAME
+
+  submit-training-job:
+    needs: [detect-changes, build-trainer-image]
+    runs-on: ubuntu-latest
+    if: |
+      needs.detect-changes.outputs.code_changed == 'true' ||
+      needs.detect-changes.outputs.data_changed == 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG }}" > ~/.kube/config
+
+      - name: Render training job manifest
+        run: |
+          IMAGE_TAG=${{ github.sha }}
+          if [[ "${{ needs.detect-changes.outputs.code_changed }}" != "true" ]]; then
+            IMAGE_TAG=latest
+          fi
+
+          sed "s|__IMAGE__|$REGISTRY/${{ github.repository_owner }}/$IMAGE_NAME:$IMAGE_TAG|g" \
+            k8s/training-job.yml > /tmp/training-job.yml
+
+      - name: Submit training job
+        run: |
+          kubectl delete job housing-training-job -n $K8S_NAMESPACE --ignore-not-found
+          kubectl apply -f /tmp/training-job.yml -n $K8S_NAMESPACE
