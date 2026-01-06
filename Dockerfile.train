@@ -12,3 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install dvc[s3]
 
 ENTRYPOINT ["/bin/bash", "-c"]
+
+
+
+
